@@ -1,8 +1,7 @@
-import type { Config } from 'tailwindcss'
+import type { Config } from "tailwindcss";
 
 export default {
   plugins: {
-    'daisyui': {},
+    daisyui: {},
   },
-} satisfies Config
-
+} satisfies Config;

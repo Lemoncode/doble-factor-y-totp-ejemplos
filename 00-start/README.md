@@ -24,12 +24,14 @@ Proyecto completo con frontend React y backend Express con TypeScript.
 ### 1. Instalar dependencias
 
 **Backend:**
+
 ```bash
 cd backend
 npm install
 ```
 
 **Frontend:**
+
 ```bash
 cd frontend
 npm install
@@ -38,6 +40,7 @@ npm install
 ### 2. Iniciar en modo desarrollo
 
 **Terminal 1 - Backend:**
+
 ```bash
 cd backend
 npm run dev
@@ -46,6 +49,7 @@ npm run dev
 El servidor estará disponible en `http://localhost:3000`
 
 **Terminal 2 - Frontend:**
+
 ```bash
 cd frontend
 npm run dev
@@ -56,6 +60,7 @@ La aplicación estará disponible en `http://localhost:5173`
 ## Tecnologías
 
 ### Frontend
+
 - React 19
 - TypeScript
 - Vite 7
@@ -64,6 +69,7 @@ La aplicación estará disponible en `http://localhost:5173`
 - React Router DOM
 
 ### Backend
+
 - Node.js
 - Express 5
 - TypeScript

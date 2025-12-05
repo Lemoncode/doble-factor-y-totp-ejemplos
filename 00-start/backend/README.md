@@ -18,9 +18,11 @@ npm install
 ## Endpoints
 
 ### POST /api/login
+
 Autenticación de usuario.
 
 **Body:**
+
 ```json
 {
   "email": "user@example.com",
@@ -29,6 +31,7 @@ Autenticación de usuario.
 ```
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -44,9 +47,11 @@ Autenticación de usuario.
 ```
 
 ### POST /api/signup
+
 Registro de nuevo usuario.
 
 **Body:**
+
 ```json
 {
   "email": "user@example.com",
@@ -56,6 +61,7 @@ Registro de nuevo usuario.
 ```
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -70,9 +76,11 @@ Registro de nuevo usuario.
 ```
 
 ### GET /api/health
+
 Health check del servidor.
 
 **Response:**
+
 ```json
 {
   "status": "ok",
