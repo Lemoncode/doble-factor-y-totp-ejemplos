@@ -3,6 +3,8 @@ import cors from "cors";
 import dotenv from "dotenv";
 import { connectDB, getDB } from "./db/connection";
 import { User, hashPassword, comparePassword } from "./models/User";
+import * as OTPAuth from "otpauth";
+import QRCode from "qrcode";
 
 dotenv.config();
 
@@ -77,6 +79,7 @@ app.post(
             id: user._id,
             email: user.email,
             name: user.name,
+            twoFactorEnabled: user.twoFactorEnabled || false,
           },
         },
       });
@@ -128,6 +131,7 @@ app.post(
         name,
         email: email.toLowerCase(),
         password: hashedPassword,
+        twoFactorEnabled: false,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -142,6 +146,7 @@ app.post(
             id: result.insertedId,
             email: newUser.email,
             name: newUser.name,
+            twoFactorEnabled: false,
           },
         },
       });
@@ -155,6 +160,79 @@ app.post(
     }
   }
 );
+
+// Endpoint para generar secret y QR code para 2FA
+app.post("/api/2fa/setup", async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: "userId es requerido",
+      });
+    }
+
+    const db = getDB();
+    const usersCollection = db.collection<User>("users");
+
+    // Buscar usuario
+    const user = await usersCollection.findOne({
+      _id: new (require("mongodb").ObjectId)(userId),
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Usuario no encontrado",
+      });
+    }
+
+    // Generar secret
+    const secret = new OTPAuth.Secret({ size: 20 });
+
+    // Crear TOTP
+    const totp = new OTPAuth.TOTP({
+      issuer: "MiApp",
+      label: user.email,
+      algorithm: "SHA1",
+      digits: 6,
+      period: 30,
+      secret: secret,
+    });
+
+    // Generar URL otpauth
+    const otpauthUrl = totp.toString();
+
+    // Generar QR code
+    const qrCodeDataUrl = await QRCode.toDataURL(otpauthUrl);
+
+    // Guardar el secret en la base de datos (aún no habilitado)
+    await usersCollection.updateOne(
+      { _id: user._id },
+      {
+        $set: {
+          twoFactorSecret: secret.base32,
+          updatedAt: new Date(),
+        },
+      }
+    );
+
+    res.json({
+      success: true,
+      data: {
+        secret: secret.base32,
+        qrCode: qrCodeDataUrl,
+      },
+    });
+  } catch (error) {
+    console.error("Error en setup 2FA:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error del servidor",
+    });
+  }
+});
 
 // Endpoint de salud
 app.get("/api/health", (_req: Request, res: Response) => {
