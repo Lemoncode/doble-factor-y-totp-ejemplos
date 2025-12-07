@@ -1,8 +1,8 @@
 import express, { Request, Response } from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import { connectDB } from "./db/connection";
-import { User } from "./models/User";
+import { connectDB, getDB } from "./db/connection";
+import { User, hashPassword, comparePassword } from "./models/User";
 
 dotenv.config();
 
@@ -43,8 +43,13 @@ app.post(
         });
       }
 
+      const db = getDB();
+      const usersCollection = db.collection<User>("users");
+
       // Buscar usuario por email
-      const user = await User.findOne({ email });
+      const user = await usersCollection.findOne({
+        email: email.toLowerCase(),
+      });
 
       if (!user) {
         return res.status(401).json({
@@ -54,7 +59,7 @@ app.post(
       }
 
       // Verificar contraseña
-      const isPasswordValid = await user.comparePassword(password);
+      const isPasswordValid = await comparePassword(password, user.password);
 
       if (!isPasswordValid) {
         return res.status(401).json({
@@ -100,8 +105,13 @@ app.post(
         });
       }
 
+      const db = getDB();
+      const usersCollection = db.collection<User>("users");
+
       // Verificar si el usuario ya existe
-      const existingUser = await User.findOne({ email });
+      const existingUser = await usersCollection.findOne({
+        email: email.toLowerCase(),
+      });
 
       if (existingUser) {
         return res.status(400).json({
@@ -110,37 +120,33 @@ app.post(
         });
       }
 
-      // Crear nuevo usuario
-      const user = new User({
-        name,
-        email,
-        password, // Se hasheará automáticamente por el middleware del modelo
-      });
+      // Hash de la contraseña
+      const hashedPassword = await hashPassword(password);
 
-      await user.save();
+      // Crear nuevo usuario
+      const newUser: User = {
+        name,
+        email: email.toLowerCase(),
+        password: hashedPassword,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const result = await usersCollection.insertOne(newUser);
 
       res.status(201).json({
         success: true,
         message: "Usuario registrado exitosamente",
         data: {
           user: {
-            id: user._id,
-            email: user.email,
-            name: user.name,
+            id: result.insertedId,
+            email: newUser.email,
+            name: newUser.name,
           },
         },
       });
     } catch (error: any) {
       console.error("Error en signup:", error);
-
-      // Errores de validación de Mongoose
-      if (error.name === "ValidationError") {
-        return res.status(400).json({
-          success: false,
-          message: "Error de validación",
-          errors: Object.values(error.errors).map((e: any) => e.message),
-        });
-      }
 
       res.status(500).json({
         success: false,
