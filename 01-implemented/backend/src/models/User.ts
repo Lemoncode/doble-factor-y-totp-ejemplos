@@ -6,6 +6,8 @@ export interface User {
   name: string;
   email: string;
   password: string;
+  twoFactorEnabled?: boolean;
+  twoFactorSecret?: string;
   createdAt?: Date;
   updatedAt?: Date;
 }

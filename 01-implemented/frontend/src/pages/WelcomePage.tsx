@@ -41,7 +41,15 @@ export const WelcomePage = () => {
             Has iniciado sesión exitosamente
           </p>
 
-          <div className="card-actions justify-center mt-4">
+          <div className="card-actions justify-center mt-4 flex-col gap-2">
+            {!userData?.twoFactorEnabled && (
+              <button
+                onClick={() => navigate("/setup-2fa")}
+                className="btn btn-primary"
+              >
+                Configurar autenticación de dos factores
+              </button>
+            )}
             <button
               onClick={handleLogout}
               className="btn btn-outline btn-error"
