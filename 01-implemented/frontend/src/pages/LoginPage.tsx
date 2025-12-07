@@ -44,6 +44,12 @@ export const LoginPage = () => {
         return;
       }
 
+      // Si el usuario tiene 2FA habilitado, redirigir a verificación
+      if (data.data.user.twoFactorEnabled) {
+        navigate("/verify-2fa", { state: { user: data.data.user } });
+        return;
+      }
+
       // Guardar datos del usuario en localStorage
       localStorage.setItem("user", JSON.stringify(data.data.user));
 

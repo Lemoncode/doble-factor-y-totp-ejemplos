@@ -7,6 +7,9 @@ export const Setup2FAPage = () => {
   const [secret, setSecret] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>("");
+  const [verificationCode, setVerificationCode] = useState<string>("");
+  const [verifying, setVerifying] = useState<boolean>(false);
+  const [showVerification, setShowVerification] = useState<boolean>(false);
 
   useEffect(() => {
     const generateQRCode = async () => {
@@ -39,6 +42,7 @@ export const Setup2FAPage = () => {
 
         setQrCode(data.data.qrCode);
         setSecret(data.data.secret);
+        setShowVerification(true);
       } catch (err: any) {
         setError(err.message || "Error al generar el código QR");
       } finally {
@@ -48,6 +52,46 @@ export const Setup2FAPage = () => {
 
     generateQRCode();
   }, []);
+
+  const handleEnableVerification = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setVerifying(true);
+
+    try {
+      const userDataStr = localStorage.getItem("user");
+      const userData = userDataStr ? JSON.parse(userDataStr) : null;
+
+      const response = await fetch("/api/2fa/enable", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          userId: userData.id,
+          code: verificationCode,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.message || "Código incorrecto");
+        setVerifying(false);
+        return;
+      }
+
+      // Actualizar el estado del usuario en localStorage
+      const updatedUser = { ...userData, twoFactorEnabled: true };
+      localStorage.setItem("user", JSON.stringify(updatedUser));
+
+      // Redirigir a welcome
+      navigate("/welcome");
+    } catch (err: any) {
+      setError(err.message || "Error al habilitar 2FA");
+      setVerifying(false);
+    }
+  };
 
   const handleBack = () => {
     navigate("/welcome");
@@ -95,6 +139,46 @@ export const Setup2FAPage = () => {
                     {secret}
                   </div>
                 </div>
+
+                {showVerification && (
+                  <>
+                    <div className="divider">Verifica tu configuración</div>
+                    <form onSubmit={handleEnableVerification}>
+                      <div className="form-control">
+                        <label className="label">
+                          <span className="label-text">
+                            Introduce el código de 6 dígitos de tu app
+                          </span>
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="000000"
+                          className="input input-bordered text-center text-2xl tracking-widest"
+                          value={verificationCode}
+                          onChange={(e) =>
+                            setVerificationCode(
+                              e.target.value.replace(/\D/g, "")
+                            )
+                          }
+                          maxLength={6}
+                          required
+                        />
+                      </div>
+
+                      <div className="form-control mt-4">
+                        <button
+                          type="submit"
+                          className={`btn btn-primary ${
+                            verifying ? "loading" : ""
+                          }`}
+                          disabled={verifying || verificationCode.length !== 6}
+                        >
+                          {verifying ? "Verificando..." : "Habilitar 2FA"}
+                        </button>
+                      </div>
+                    </form>
+                  </>
+                )}
               </div>
             </>
           )}

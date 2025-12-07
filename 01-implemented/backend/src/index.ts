@@ -235,6 +235,151 @@ app.post("/api/2fa/setup", async (req: Request, res: Response) => {
   }
 });
 
+// Endpoint para verificar código 2FA
+app.post("/api/2fa/verify", async (req: Request, res: Response) => {
+  try {
+    const { userId, code } = req.body;
+
+    if (!userId || !code) {
+      return res.status(400).json({
+        success: false,
+        message: "userId y código son requeridos",
+      });
+    }
+
+    const db = getDB();
+    const usersCollection = db.collection<User>("users");
+
+    // Buscar usuario
+    const user = await usersCollection.findOne({
+      _id: new ObjectId(userId),
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Usuario no encontrado",
+      });
+    }
+
+    if (!user.twoFactorSecret) {
+      return res.status(400).json({
+        success: false,
+        message: "2FA no configurado para este usuario",
+      });
+    }
+
+    // Crear TOTP con el secret del usuario
+    const totp = new OTPAuth.TOTP({
+      issuer: "MiApp",
+      label: user.email,
+      algorithm: "SHA1",
+      digits: 6,
+      period: 30,
+      secret: OTPAuth.Secret.fromBase32(user.twoFactorSecret),
+    });
+
+    // Validar el código (con ventana de tolerancia de 1 período = 30s antes/después)
+    const delta = totp.validate({ token: code, window: 1 });
+
+    if (delta === null) {
+      return res.status(401).json({
+        success: false,
+        message: "Código incorrecto o expirado",
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "Código verificado correctamente",
+    });
+  } catch (error) {
+    console.error("Error en verificación 2FA:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error del servidor",
+    });
+  }
+});
+
+// Endpoint para habilitar 2FA después de verificar el código
+app.post("/api/2fa/enable", async (req: Request, res: Response) => {
+  try {
+    const { userId, code } = req.body;
+
+    if (!userId || !code) {
+      return res.status(400).json({
+        success: false,
+        message: "userId y código son requeridos",
+      });
+    }
+
+    const db = getDB();
+    const usersCollection = db.collection<User>("users");
+
+    // Buscar usuario
+    const user = await usersCollection.findOne({
+      _id: new ObjectId(userId),
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Usuario no encontrado",
+      });
+    }
+
+    if (!user.twoFactorSecret) {
+      return res.status(400).json({
+        success: false,
+        message: "Primero debes generar el código QR",
+      });
+    }
+
+    // Crear TOTP con el secret del usuario
+    const totp = new OTPAuth.TOTP({
+      issuer: "MiApp",
+      label: user.email,
+      algorithm: "SHA1",
+      digits: 6,
+      period: 30,
+      secret: OTPAuth.Secret.fromBase32(user.twoFactorSecret),
+    });
+
+    // Validar el código
+    const delta = totp.validate({ token: code, window: 1 });
+
+    if (delta === null) {
+      return res.status(401).json({
+        success: false,
+        message: "Código incorrecto o expirado",
+      });
+    }
+
+    // Habilitar 2FA
+    await usersCollection.updateOne(
+      { _id: user._id },
+      {
+        $set: {
+          twoFactorEnabled: true,
+          updatedAt: new Date(),
+        },
+      }
+    );
+
+    res.json({
+      success: true,
+      message: "Autenticación de dos factores habilitada correctamente",
+    });
+  } catch (error) {
+    console.error("Error al habilitar 2FA:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error del servidor",
+    });
+  }
+});
+
 // Endpoint de salud
 app.get("/api/health", (_req: Request, res: Response) => {
   res.json({
