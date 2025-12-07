@@ -1,6 +1,7 @@
 import express, { Request, Response } from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import { ObjectId } from "mongodb";
 import { connectDB, getDB } from "./db/connection";
 import { User, hashPassword, comparePassword } from "./models/User";
 import * as OTPAuth from "otpauth";
@@ -178,7 +179,7 @@ app.post("/api/2fa/setup", async (req: Request, res: Response) => {
 
     // Buscar usuario
     const user = await usersCollection.findOne({
-      _id: new (require("mongodb").ObjectId)(userId),
+      _id: new ObjectId(userId),
     });
 
     if (!user) {
