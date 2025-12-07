@@ -7,6 +7,8 @@
     "dev": "vite",
     "dev:all": "concurrently \"npm run dev:backend\" \"npm run dev\"",
     "dev:backend": "cd ../backend && npm run dev",
+    "docker:up": "cd .. && docker-compose up -d",
+    "docker:down": "cd .. && docker-compose down",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
