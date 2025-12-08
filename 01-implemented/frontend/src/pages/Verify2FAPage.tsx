@@ -8,11 +8,12 @@ export const Verify2FAPage = () => {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Obtener datos del usuario del state de navegación
+  // Obtener datos del usuario y token temporal del state de navegación
   const userData = location.state?.user;
+  const tempToken = location.state?.tempToken;
 
-  // Si no hay datos de usuario, redirigir al login
-  if (!userData) {
+  // Si no hay datos de usuario o token temporal, redirigir al login
+  if (!userData || !tempToken) {
     navigate("/login");
     return null;
   }
@@ -25,11 +26,12 @@ export const Verify2FAPage = () => {
     try {
       const response = await fetch("/api/2fa/verify", {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          userId: userData.id,
+          tempToken: tempToken,
           code: code,
         }),
       });
@@ -42,9 +44,7 @@ export const Verify2FAPage = () => {
         return;
       }
 
-      // Guardar datos del usuario en localStorage
-      localStorage.setItem("user", JSON.stringify(userData));
-
+      // La sesión se establece mediante httpOnly cookie
       // Redirigir a la página de bienvenida
       navigate("/welcome");
     } catch (err) {

@@ -33,6 +33,7 @@ export const LoginPage = () => {
         headers: {
           "Content-Type": "application/json",
         },
+        credentials: "include", // Importante para cookies
         body: JSON.stringify(formData),
       });
 
@@ -44,16 +45,18 @@ export const LoginPage = () => {
         return;
       }
 
-      // Si el usuario tiene 2FA habilitado, redirigir a verificación
-      if (data.data.user.twoFactorEnabled) {
-        navigate("/verify-2fa", { state: { user: data.data.user } });
+      // Si el usuario tiene 2FA habilitado, redirigir a verificación con token temporal
+      if (data.data.requiresTwoFactor) {
+        navigate("/verify-2fa", { 
+          state: { 
+            user: data.data.user,
+            tempToken: data.data.tempToken
+          } 
+        });
         return;
       }
 
-      // Guardar datos del usuario en localStorage
-      localStorage.setItem("user", JSON.stringify(data.data.user));
-
-      // Redirigir a la página de bienvenida
+      // Redirigir a la página de bienvenida (cookie ya está establecida)
       navigate("/welcome");
     } catch (err) {
       setError("Error de conexión con el servidor");

@@ -16,23 +16,29 @@ export const Setup2FAPage = () => {
   useEffect(() => {
     const generateQRCode = async () => {
       try {
-        // Obtener userId del localStorage
-        const userDataStr = localStorage.getItem("user");
-        const userData = userDataStr ? JSON.parse(userDataStr) : null;
+        // Obtener userId del usuario autenticado
+        const userResponse = await fetch("/api/user/me", {
+          method: "GET",
+          credentials: "include",
+        });
 
-        if (!userData || !userData.id) {
+        if (!userResponse.ok) {
           setError("No se encontró información del usuario");
           setLoading(false);
           return;
         }
 
-        const response = await fetch("http://localhost:3000/api/2fa/setup", {
+        const userData = await userResponse.json();
+        const userId = userData.data.user.id;
+
+        const response = await fetch("/api/2fa/setup", {
           method: "POST",
+          credentials: "include",
           headers: {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            userId: userData.id,
+            userId: userId,
           }),
         });
 
@@ -61,16 +67,28 @@ export const Setup2FAPage = () => {
     setVerifying(true);
 
     try {
-      const userDataStr = localStorage.getItem("user");
-      const userData = userDataStr ? JSON.parse(userDataStr) : null;
+      const userResponse = await fetch("/api/user/me", {
+        method: "GET",
+        credentials: "include",
+      });
+
+      if (!userResponse.ok) {
+        setError("No se encontró información del usuario");
+        setVerifying(false);
+        return;
+      }
+
+      const userData = await userResponse.json();
+      const userId = userData.data.user.id;
 
       const response = await fetch("/api/2fa/enable", {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          userId: userData.id,
+          userId: userId,
           code: verificationCode,
         }),
       });
@@ -88,10 +106,6 @@ export const Setup2FAPage = () => {
         setRecoveryCodes(data.data.recoveryCodes);
         setShowRecoveryCodes(true);
       }
-
-      // Actualizar el estado del usuario en localStorage
-      const updatedUser = { ...userData, twoFactorEnabled: true };
-      localStorage.setItem("user", JSON.stringify(updatedUser));
     } catch (err: any) {
       setError(err.message || "Error al habilitar 2FA");
       setVerifying(false);

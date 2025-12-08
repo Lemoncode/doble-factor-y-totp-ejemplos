@@ -1,5 +1,6 @@
 import express, { Request, Response } from "express";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
 import { ObjectId } from "mongodb";
 import { connectDB, getDB } from "./db/connection";
@@ -13,6 +14,12 @@ import * as OTPAuth from "otpauth";
 import QRCode from "qrcode";
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
+import {
+  generateSessionToken,
+  generateTempToken,
+  authenticateToken,
+  verifyTempToken,
+} from "./middleware/auth";
 
 dotenv.config();
 
@@ -20,7 +27,11 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: "http://localhost:5173", // URL del frontend
+  credentials: true, // Permitir cookies
+}));
+app.use(cookieParser());
 app.use(express.json());
 
 // Conectar a MongoDB
@@ -101,7 +112,36 @@ app.post(
         });
       }
 
-      // Login exitoso
+      // Si el usuario tiene 2FA habilitado, devolver token temporal
+      if (user.twoFactorEnabled) {
+        const tempToken = generateTempToken(user._id!.toString());
+
+        return res.json({
+          success: true,
+          message: "Verificación 2FA requerida",
+          data: {
+            requiresTwoFactor: true,
+            tempToken,
+            user: {
+              id: user._id,
+              email: user.email,
+              name: user.name,
+            },
+          },
+        });
+      }
+
+      // Si no tiene 2FA, devolver token de sesión directamente
+      const sessionToken = generateSessionToken(user._id!.toString());
+
+      // Establecer cookie httpOnly
+      res.cookie("sessionToken", sessionToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        maxAge: 60 * 60 * 1000, // 1 hora
+      });
+
       res.json({
         success: true,
         message: "Login exitoso",
@@ -110,7 +150,7 @@ app.post(
             id: user._id,
             email: user.email,
             name: user.name,
-            twoFactorEnabled: user.twoFactorEnabled || false,
+            twoFactorEnabled: false,
           },
         },
       });
@@ -268,12 +308,22 @@ app.post("/api/2fa/setup", async (req: Request, res: Response) => {
 // Endpoint para verificar código 2FA
 app.post("/api/2fa/verify", async (req: Request, res: Response) => {
   try {
-    const { userId, code } = req.body;
+    const { tempToken, code } = req.body;
 
-    if (!userId || !code) {
+    if (!tempToken || !code) {
       return res.status(400).json({
         success: false,
-        message: "userId y código son requeridos",
+        message: "tempToken y código son requeridos",
+      });
+    }
+
+    // Verificar el token temporal
+    const decoded = verifyTempToken(tempToken);
+
+    if (!decoded) {
+      return res.status(401).json({
+        success: false,
+        message: "Token temporal inválido o expirado",
       });
     }
 
@@ -282,7 +332,7 @@ app.post("/api/2fa/verify", async (req: Request, res: Response) => {
 
     // Buscar usuario
     const user = await usersCollection.findOne({
-      _id: new ObjectId(userId),
+      _id: new ObjectId(decoded.userId),
     });
 
     if (!user) {
@@ -313,9 +363,27 @@ app.post("/api/2fa/verify", async (req: Request, res: Response) => {
 
     // Si es un código TOTP válido
     if (delta !== null) {
+      const sessionToken = generateSessionToken(user._id!.toString());
+
+      // Establecer cookie httpOnly
+      res.cookie("sessionToken", sessionToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        maxAge: 60 * 60 * 1000, // 1 hora
+      });
+
       return res.json({
         success: true,
         message: "Código verificado correctamente",
+        data: {
+          user: {
+            id: user._id,
+            email: user.email,
+            name: user.name,
+            twoFactorEnabled: true,
+          },
+        },
       });
     }
 
@@ -344,11 +412,27 @@ app.post("/api/2fa/verify", async (req: Request, res: Response) => {
             }
           );
 
+          const sessionToken = generateSessionToken(user._id!.toString());
+
+          // Establecer cookie httpOnly
+          res.cookie("sessionToken", sessionToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production",
+            sameSite: "strict",
+            maxAge: 60 * 60 * 1000, // 1 hora
+          });
+
           return res.json({
             success: true,
             message: "Código de recuperación verificado correctamente",
             data: {
               isRecoveryCode: true,
+              user: {
+                id: user._id,
+                email: user.email,
+                name: user.name,
+                twoFactorEnabled: true,
+              },
             },
           });
         }
@@ -448,6 +532,92 @@ app.post("/api/2fa/enable", async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Error al habilitar 2FA:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error del servidor",
+    });
+  }
+});
+
+// Endpoint protegido - requiere autenticación JWT
+app.get("/api/protected/data", authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const db = getDB();
+    const usersCollection = db.collection<User>("users");
+
+    // Buscar usuario autenticado
+    const user = await usersCollection.findOne({
+      _id: new ObjectId(req.userId),
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Usuario no encontrado",
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "Sólo puedes leer esto si estás autenticado",
+      data: {
+        user: {
+          name: user.name,
+          email: user.email,
+          twoFactorEnabled: user.twoFactorEnabled || false,
+        },
+        timestamp: new Date().toISOString(),
+        secretMessage: "¡Felicidades! Has accedido a un recurso protegido.",
+      },
+    });
+  } catch (error) {
+    console.error("Error en endpoint protegido:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error del servidor",
+    });
+  }
+});
+
+// Endpoint de logout
+app.post("/api/logout", (_req: Request, res: Response) => {
+  res.clearCookie("sessionToken");
+  res.json({
+    success: true,
+    message: "Sesión cerrada correctamente",
+  });
+});
+
+// Endpoint para obtener datos del usuario actual
+app.get("/api/user/me", authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const db = getDB();
+    const usersCollection = db.collection<User>("users");
+
+    const user = await usersCollection.findOne({
+      _id: new ObjectId(req.userId),
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Usuario no encontrado",
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          twoFactorEnabled: user.twoFactorEnabled || false,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Error al obtener usuario:", error);
     res.status(500).json({
       success: false,
       message: "Error del servidor",
