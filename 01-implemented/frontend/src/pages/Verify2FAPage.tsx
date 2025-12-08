@@ -99,7 +99,11 @@ export const Verify2FAPage = () => {
                 placeholder="000000 o código de recuperación"
                 className="input input-bordered text-center text-xl tracking-wider"
                 value={code}
-                onChange={(e) => setCode(e.target.value.replace(/[^A-Za-z0-9]/g, "").toUpperCase())}
+                onChange={(e) =>
+                  setCode(
+                    e.target.value.replace(/[^A-Za-z0-9]/g, "").toUpperCase()
+                  )
+                }
                 maxLength={8}
                 required
                 autoFocus

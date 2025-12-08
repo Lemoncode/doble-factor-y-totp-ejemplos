@@ -234,8 +234,8 @@ export const Setup2FAPage = () => {
                   />
                 </svg>
                 <span>
-                  Guarda estos códigos de recuperación en un lugar seguro.
-                  ¡Solo se mostrarán una vez!
+                  Guarda estos códigos de recuperación en un lugar seguro. ¡Solo
+                  se mostrarán una vez!
                 </span>
               </div>
 
@@ -254,8 +254,8 @@ export const Setup2FAPage = () => {
                   ))}
                 </div>
                 <p className="text-xs text-gray-500 mt-2">
-                  Estos códigos pueden ser usados una sola vez si pierdes
-                  acceso a tu aplicación de autenticación.
+                  Estos códigos pueden ser usados una sola vez si pierdes acceso
+                  a tu aplicación de autenticación.
                 </p>
               </div>
 

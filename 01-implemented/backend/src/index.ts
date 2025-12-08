@@ -3,7 +3,12 @@ import cors from "cors";
 import dotenv from "dotenv";
 import { ObjectId } from "mongodb";
 import { connectDB, getDB } from "./db/connection";
-import { User, hashPassword, comparePassword, RecoveryCode } from "./models/User";
+import {
+  User,
+  hashPassword,
+  comparePassword,
+  RecoveryCode,
+} from "./models/User";
 import * as OTPAuth from "otpauth";
 import QRCode from "qrcode";
 import crypto from "crypto";
@@ -22,13 +27,15 @@ app.use(express.json());
 connectDB();
 
 // Función para generar recovery codes
-const generateRecoveryCodes = async (count: number = 6): Promise<{ plain: string[]; hashed: RecoveryCode[] }> => {
+const generateRecoveryCodes = async (
+  count: number = 6
+): Promise<{ plain: string[]; hashed: RecoveryCode[] }> => {
   const plainCodes: string[] = [];
   const hashedCodes: RecoveryCode[] = [];
 
   for (let i = 0; i < count; i++) {
     // Generar código aleatorio de 8 caracteres
-    const code = crypto.randomBytes(4).toString('hex').toUpperCase();
+    const code = crypto.randomBytes(4).toString("hex").toUpperCase();
     plainCodes.push(code);
 
     // Hashear el código
@@ -316,7 +323,7 @@ app.post("/api/2fa/verify", async (req: Request, res: Response) => {
     if (user.recoveryCodes && user.recoveryCodes.length > 0) {
       for (let i = 0; i < user.recoveryCodes.length; i++) {
         const recoveryCode = user.recoveryCodes[i];
-        
+
         // Saltar si el código no existe o ya fue usado
         if (!recoveryCode || recoveryCode.used) {
           continue;
@@ -417,7 +424,8 @@ app.post("/api/2fa/enable", async (req: Request, res: Response) => {
     }
 
     // Generar recovery codes
-    const { plain: plainRecoveryCodes, hashed: hashedRecoveryCodes } = await generateRecoveryCodes(6);
+    const { plain: plainRecoveryCodes, hashed: hashedRecoveryCodes } =
+      await generateRecoveryCodes(6);
 
     // Habilitar 2FA y guardar recovery codes
     await usersCollection.updateOne(
