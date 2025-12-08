@@ -54,13 +54,13 @@ export const authenticateToken = (
 
 export const generateSessionToken = (userId: string): string => {
   const secret = process.env.JWT_SECRET || "fallback-secret";
-  
+
   return jwt.sign({ userId, type: "session" }, secret, { expiresIn: "1h" });
 };
 
 export const generateTempToken = (userId: string): string => {
   const secret = process.env.JWT_SECRET || "fallback-secret";
-  
+
   return jwt.sign({ userId, type: "temp" }, secret, { expiresIn: "5m" });
 };
 

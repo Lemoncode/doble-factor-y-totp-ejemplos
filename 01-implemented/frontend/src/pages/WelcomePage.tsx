@@ -69,7 +69,9 @@ export const WelcomePage = () => {
 
       if (!response.ok) {
         if (response.status === 401 || response.status === 403) {
-          setDataError("Tu sesión ha expirado. Por favor, inicia sesión nuevamente.");
+          setDataError(
+            "Tu sesión ha expirado. Por favor, inicia sesión nuevamente."
+          );
           setTimeout(() => {
             handleLogout();
           }, 2000);
@@ -151,7 +153,9 @@ export const WelcomePage = () => {
             <div className="alert alert-success mt-4">
               <div className="flex flex-col items-start">
                 <span className="font-bold">{protectedData.message}</span>
-                <span className="text-sm mt-2">{protectedData.data.secretMessage}</span>
+                <span className="text-sm mt-2">
+                  {protectedData.data.secretMessage}
+                </span>
               </div>
             </div>
           )}

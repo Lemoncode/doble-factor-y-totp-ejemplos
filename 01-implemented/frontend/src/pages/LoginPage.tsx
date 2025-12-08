@@ -47,11 +47,11 @@ export const LoginPage = () => {
 
       // Si el usuario tiene 2FA habilitado, redirigir a verificación con token temporal
       if (data.data.requiresTwoFactor) {
-        navigate("/verify-2fa", { 
-          state: { 
+        navigate("/verify-2fa", {
+          state: {
             user: data.data.user,
-            tempToken: data.data.tempToken
-          } 
+            tempToken: data.data.tempToken,
+          },
         });
         return;
       }

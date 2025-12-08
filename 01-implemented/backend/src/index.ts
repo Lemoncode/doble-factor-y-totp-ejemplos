@@ -27,10 +27,12 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middleware
-app.use(cors({
-  origin: "http://localhost:5173", // URL del frontend
-  credentials: true, // Permitir cookies
-}));
+app.use(
+  cors({
+    origin: "http://localhost:5173", // URL del frontend
+    credentials: true, // Permitir cookies
+  })
+);
 app.use(cookieParser());
 app.use(express.json());
 
@@ -540,44 +542,48 @@ app.post("/api/2fa/enable", async (req: Request, res: Response) => {
 });
 
 // Endpoint protegido - requiere autenticación JWT
-app.get("/api/protected/data", authenticateToken, async (req: Request, res: Response) => {
-  try {
-    const db = getDB();
-    const usersCollection = db.collection<User>("users");
+app.get(
+  "/api/protected/data",
+  authenticateToken,
+  async (req: Request, res: Response) => {
+    try {
+      const db = getDB();
+      const usersCollection = db.collection<User>("users");
 
-    // Buscar usuario autenticado
-    const user = await usersCollection.findOne({
-      _id: new ObjectId(req.userId),
-    });
+      // Buscar usuario autenticado
+      const user = await usersCollection.findOne({
+        _id: new ObjectId(req.userId),
+      });
 
-    if (!user) {
-      return res.status(404).json({
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: "Usuario no encontrado",
+        });
+      }
+
+      res.json({
+        success: true,
+        message: "Sólo puedes leer esto si estás autenticado",
+        data: {
+          user: {
+            name: user.name,
+            email: user.email,
+            twoFactorEnabled: user.twoFactorEnabled || false,
+          },
+          timestamp: new Date().toISOString(),
+          secretMessage: "¡Felicidades! Has accedido a un recurso protegido.",
+        },
+      });
+    } catch (error) {
+      console.error("Error en endpoint protegido:", error);
+      res.status(500).json({
         success: false,
-        message: "Usuario no encontrado",
+        message: "Error del servidor",
       });
     }
-
-    res.json({
-      success: true,
-      message: "Sólo puedes leer esto si estás autenticado",
-      data: {
-        user: {
-          name: user.name,
-          email: user.email,
-          twoFactorEnabled: user.twoFactorEnabled || false,
-        },
-        timestamp: new Date().toISOString(),
-        secretMessage: "¡Felicidades! Has accedido a un recurso protegido.",
-      },
-    });
-  } catch (error) {
-    console.error("Error en endpoint protegido:", error);
-    res.status(500).json({
-      success: false,
-      message: "Error del servidor",
-    });
   }
-});
+);
 
 // Endpoint de logout
 app.post("/api/logout", (_req: Request, res: Response) => {
@@ -589,41 +595,45 @@ app.post("/api/logout", (_req: Request, res: Response) => {
 });
 
 // Endpoint para obtener datos del usuario actual
-app.get("/api/user/me", authenticateToken, async (req: Request, res: Response) => {
-  try {
-    const db = getDB();
-    const usersCollection = db.collection<User>("users");
+app.get(
+  "/api/user/me",
+  authenticateToken,
+  async (req: Request, res: Response) => {
+    try {
+      const db = getDB();
+      const usersCollection = db.collection<User>("users");
 
-    const user = await usersCollection.findOne({
-      _id: new ObjectId(req.userId),
-    });
+      const user = await usersCollection.findOne({
+        _id: new ObjectId(req.userId),
+      });
 
-    if (!user) {
-      return res.status(404).json({
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: "Usuario no encontrado",
+        });
+      }
+
+      res.json({
+        success: true,
+        data: {
+          user: {
+            id: user._id,
+            name: user.name,
+            email: user.email,
+            twoFactorEnabled: user.twoFactorEnabled || false,
+          },
+        },
+      });
+    } catch (error) {
+      console.error("Error al obtener usuario:", error);
+      res.status(500).json({
         success: false,
-        message: "Usuario no encontrado",
+        message: "Error del servidor",
       });
     }
-
-    res.json({
-      success: true,
-      data: {
-        user: {
-          id: user._id,
-          name: user.name,
-          email: user.email,
-          twoFactorEnabled: user.twoFactorEnabled || false,
-        },
-      },
-    });
-  } catch (error) {
-    console.error("Error al obtener usuario:", error);
-    res.status(500).json({
-      success: false,
-      message: "Error del servidor",
-    });
   }
-});
+);
 
 // Endpoint de salud
 app.get("/api/health", (_req: Request, res: Response) => {
