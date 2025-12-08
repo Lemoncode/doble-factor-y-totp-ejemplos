@@ -67,7 +67,7 @@ export const Verify2FAPage = () => {
 
           <p className="text-sm text-gray-600 text-center mb-4">
             Introduce el código de 6 dígitos generado por tu aplicación de
-            autenticación.
+            autenticación o un código de recuperación.
           </p>
 
           {error && (
@@ -96,21 +96,26 @@ export const Verify2FAPage = () => {
               </label>
               <input
                 type="text"
-                placeholder="000000"
-                className="input input-bordered text-center text-2xl tracking-widest"
+                placeholder="000000 o código de recuperación"
+                className="input input-bordered text-center text-xl tracking-wider"
                 value={code}
-                onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-                maxLength={6}
+                onChange={(e) => setCode(e.target.value.replace(/[^A-Za-z0-9]/g, "").toUpperCase())}
+                maxLength={8}
                 required
                 autoFocus
               />
+              <label className="label">
+                <span className="label-text-alt">
+                  Acepta códigos de 6 u 8 caracteres
+                </span>
+              </label>
             </div>
 
             <div className="form-control mt-6 flex flex-col gap-2">
               <button
                 type="submit"
                 className={`btn btn-primary ${loading ? "loading" : ""}`}
-                disabled={loading || code.length !== 6}
+                disabled={loading || (code.length !== 6 && code.length !== 8)}
               >
                 {loading ? "Verificando..." : "Verificar"}
               </button>

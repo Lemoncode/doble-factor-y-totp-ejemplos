@@ -1,6 +1,11 @@
 import { ObjectId } from "mongodb";
 import bcrypt from "bcryptjs";
 
+export interface RecoveryCode {
+  code: string; // Hasheado
+  used: boolean;
+}
+
 export interface User {
   _id?: ObjectId;
   name: string;
@@ -8,6 +13,7 @@ export interface User {
   password: string;
   twoFactorEnabled?: boolean;
   twoFactorSecret?: string;
+  recoveryCodes?: RecoveryCode[];
   createdAt?: Date;
   updatedAt?: Date;
 }

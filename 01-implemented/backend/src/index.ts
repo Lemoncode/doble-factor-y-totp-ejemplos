@@ -3,9 +3,11 @@ import cors from "cors";
 import dotenv from "dotenv";
 import { ObjectId } from "mongodb";
 import { connectDB, getDB } from "./db/connection";
-import { User, hashPassword, comparePassword } from "./models/User";
+import { User, hashPassword, comparePassword, RecoveryCode } from "./models/User";
 import * as OTPAuth from "otpauth";
 import QRCode from "qrcode";
+import crypto from "crypto";
+import bcrypt from "bcryptjs";
 
 dotenv.config();
 
@@ -18,6 +20,27 @@ app.use(express.json());
 
 // Conectar a MongoDB
 connectDB();
+
+// Función para generar recovery codes
+const generateRecoveryCodes = async (count: number = 6): Promise<{ plain: string[]; hashed: RecoveryCode[] }> => {
+  const plainCodes: string[] = [];
+  const hashedCodes: RecoveryCode[] = [];
+
+  for (let i = 0; i < count; i++) {
+    // Generar código aleatorio de 8 caracteres
+    const code = crypto.randomBytes(4).toString('hex').toUpperCase();
+    plainCodes.push(code);
+
+    // Hashear el código
+    const hashedCode = await bcrypt.hash(code, 10);
+    hashedCodes.push({
+      code: hashedCode,
+      used: false,
+    });
+  }
+
+  return { plain: plainCodes, hashed: hashedCodes };
+};
 
 // Tipos para las peticiones
 interface LoginRequest {
@@ -269,7 +292,7 @@ app.post("/api/2fa/verify", async (req: Request, res: Response) => {
       });
     }
 
-    // Crear TOTP con el secret del usuario
+    // Primero intentar validar como código TOTP
     const totp = new OTPAuth.TOTP({
       issuer: "MiApp",
       label: user.email,
@@ -279,19 +302,56 @@ app.post("/api/2fa/verify", async (req: Request, res: Response) => {
       secret: OTPAuth.Secret.fromBase32(user.twoFactorSecret),
     });
 
-    // Validar el código (con ventana de tolerancia de 1 período = 30s antes/después)
     const delta = totp.validate({ token: code, window: 1 });
 
-    if (delta === null) {
-      return res.status(401).json({
-        success: false,
-        message: "Código incorrecto o expirado",
+    // Si es un código TOTP válido
+    if (delta !== null) {
+      return res.json({
+        success: true,
+        message: "Código verificado correctamente",
       });
     }
 
-    res.json({
-      success: true,
-      message: "Código verificado correctamente",
+    // Si no es TOTP, intentar con recovery codes
+    if (user.recoveryCodes && user.recoveryCodes.length > 0) {
+      for (let i = 0; i < user.recoveryCodes.length; i++) {
+        const recoveryCode = user.recoveryCodes[i];
+        
+        // Saltar si el código no existe o ya fue usado
+        if (!recoveryCode || recoveryCode.used) {
+          continue;
+        }
+
+        // Verificar si el código coincide
+        const isMatch = await bcrypt.compare(code, recoveryCode.code);
+
+        if (isMatch) {
+          // Marcar el código como usado
+          await usersCollection.updateOne(
+            { _id: user._id },
+            {
+              $set: {
+                [`recoveryCodes.${i}.used`]: true,
+                updatedAt: new Date(),
+              },
+            }
+          );
+
+          return res.json({
+            success: true,
+            message: "Código de recuperación verificado correctamente",
+            data: {
+              isRecoveryCode: true,
+            },
+          });
+        }
+      }
+    }
+
+    // Si llegamos aquí, ni TOTP ni recovery code fueron válidos
+    return res.status(401).json({
+      success: false,
+      message: "Código incorrecto o expirado",
     });
   } catch (error) {
     console.error("Error en verificación 2FA:", error);
@@ -356,12 +416,16 @@ app.post("/api/2fa/enable", async (req: Request, res: Response) => {
       });
     }
 
-    // Habilitar 2FA
+    // Generar recovery codes
+    const { plain: plainRecoveryCodes, hashed: hashedRecoveryCodes } = await generateRecoveryCodes(6);
+
+    // Habilitar 2FA y guardar recovery codes
     await usersCollection.updateOne(
       { _id: user._id },
       {
         $set: {
           twoFactorEnabled: true,
+          recoveryCodes: hashedRecoveryCodes,
           updatedAt: new Date(),
         },
       }
@@ -370,6 +434,9 @@ app.post("/api/2fa/enable", async (req: Request, res: Response) => {
     res.json({
       success: true,
       message: "Autenticación de dos factores habilitada correctamente",
+      data: {
+        recoveryCodes: plainRecoveryCodes,
+      },
     });
   } catch (error) {
     console.error("Error al habilitar 2FA:", error);
